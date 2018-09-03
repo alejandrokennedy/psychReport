@@ -7,7 +7,25 @@
 </head>
 
 <body>
+
+	<div id="svg-container"></div>
+	
 	<script>
 		
+		const margin = {top: 30, right: 30, bottom: 30, left: 30};
+
+		const width = 670 - margin.left - margin.right,
+					height = 400 - margin.top - margin.bottom;
+
+		const svg = d3.select("#svg-container").append("svg")
+			.attr("id", "svg")
+			.attr("width", width)
+			.attr("height", height);
+
+		let rect = d3.select("#svg")
+			.append("rect")
+			.attr("width", width)
+			.attr("height", height);
+
 	</script>
 </body>
