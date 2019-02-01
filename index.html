@@ -2,30 +2,47 @@
 <meta charset="utf-8">
 
 <head>
-	<script src=https://cdnjs.cloudflare.com/ajax/libs/d3/5.5.0/d3.min.js></script>
+	<!-- <script src=https://cdnjs.cloudflare.com/ajax/libs/d3/5.5.0/d3.min.js></script> -->
+	<script src=d3v5_7.js></script>
 	<link rel="stylesheet" type="text/css" href="main.css"></head>
 </head>
 
 <body>
 
-	<div id="svg-container"></div>
+<div id="svg-container"></div>
+
+<script>
+
+const margin = {top: 30, right: 30, bottom: 30, left: 30};
+
+const width = 670 - margin.left - margin.right,
+	height = 400 - margin.top - margin.bottom;
+
+const svg = d3.select("#svg-container").append("svg")
+	.attr("id", "svg")
+	.attr("width", width)
+	.attr("height", height);
+
+importData()
+async function importData() {
 	
-	<script>
-		
-		const margin = {top: 30, right: 30, bottom: 30, left: 30};
+const data = await d3.csv("data/louis1.csv");
 
-		const width = 670 - margin.left - margin.right,
-					height = 400 - margin.top - margin.bottom;
+const isNumeric = n => !isNaN(Number(n)) && isFinite(n)
 
-		const svg = d3.select("#svg-container").append("svg")
-			.attr("id", "svg")
-			.attr("width", width)
-			.attr("height", height);
+const numericFields = [ "test_score", "scaled_score", "standard_score", "percentile_rank", "percentile_band_min", "percentile_band_max"]
 
-		let rect = d3.select("#svg")
-			.append("rect")
-			.attr("width", width)
-			.attr("height", height);
+data.forEach((object) => {
+	numericFields.forEach((score) => {
+		if (!isNumeric(object[score])) console.warn(`WARNING: ${object[score]} is not a number`)
+		object[score] === "" ? object[score] = null : object[score] = +object[score]
+	})
+})
 
-	</script>
+console.log(data)
+
+}
+
+</script>
+
 </body>
