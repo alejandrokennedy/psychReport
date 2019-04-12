@@ -16,32 +16,99 @@
 const margin = {top: 30, right: 30, bottom: 30, left: 30};
 
 const width = 670 - margin.left - margin.right,
-	height = 400 - margin.top - margin.bottom;
-
-const svg = d3.select("#svg-container").append("svg")
-	.attr("id", "svg")
-	.attr("width", width)
-	.attr("height", height);
+	height = 400 - margin.top - margin.bottom,
+	rowHeight = 80
 
 importData()
 async function importData() {
 	
 const data = await d3.csv("data/louis1.csv");
 
+// const colors = 
+
+const xScale = d3.scaleLinear()
+	.domain([0, 100])
+	.range([0, width])
+
+const yScale = d3.scalePoint()
+	// .range([height, 0])
+
 const isNumeric = n => !isNaN(Number(n)) && isFinite(n)
-
 const numericFields = [ "test_score", "scaled_score", "standard_score", "percentile_rank", "percentile_band_min", "percentile_band_max"]
+const domainsSet = new Set([])
 
-data.forEach((object) => {
+data.forEach((test) => {
 	numericFields.forEach((score) => {
-		if (!isNumeric(object[score])) console.warn(`WARNING: ${object[score]} is not a number`)
-		object[score] === "" ? object[score] = null : object[score] = +object[score]
+		if (!isNumeric(test[score])) console.warn(`WARNING: ${test[score]} is not a number`)
+		test[score] === "" ? test[score] = null : test[score] = +test[score]
 	})
+
+	if (test.domains) {
+		if (test.domains.includes('|')) {
+			test.domains.split('|').forEach(domain => {
+				domainsSet.add(domain.trim())
+			})
+		} else {
+			domainsSet.add(test.domains)
+		}
+	}
+
 })
 
-console.log(data)
+const domainsArr = [...domainsSet]
 
-}
+const domainsNested = domainsArr.map(domain => {
+	obj = {}
+	obj[domain] = []
+	data.forEach(test => {
+		if (test.domains.includes(domain)) {
+			obj[domain].push(test)
+		}
+
+	})
+	return Object.values(obj)
+})
+
+domainsNested.forEach(domain => {
+	let testArr = domain[0].map(test => test.test)
+	domain[0].forEach(test => test.domainArr = testArr)
+})
+
+const svg = d3.select('#svg-container')
+	.selectAll('svg')
+	.data(domainsNested)
+  .enter().append('svg')
+	.attr('class', 'svg')
+	.attr('width', width + margin.left + margin.right)
+	// .attr('height', height + margin.top + margin.bottom)
+	.attr('height', d => {
+		// console.log(d[0][0])
+		console.log(d[0].length)
+		// console.log(rowHeight * d[0][0].domainArr.length + margin.top + margin.bottom)
+		return rowHeight * d[0].length + margin.top + margin.bottom
+	})
+
+const gContainer = svg.append('g')
+	.attr('class', 'gContainer')
+	.attr('transform', `translate(${margin.left},${margin.top})`)
+
+const circles = gContainer.selectAll('circle')
+	.data(d => d[0])
+  .enter().append('circle')
+	.attr('r', '20')
+	.attr('cx', d => xScale(d.percentile_rank))
+	.attr('cy', d => {
+		yScale.domain(d.domainArr)
+		yScale.range([rowHeight * d.domainArr.length, 0])
+		console.log(yScale.range())
+		return yScale(d.test)
+	})
+
+const label = circles.append('text')
+	.attr('text', d => d.test)
+	.attr('transform', `translate(20, 0)`)
+
+} // importData callback
 
 </script>
 

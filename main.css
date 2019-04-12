@@ -5,6 +5,6 @@ body {
 
 svg {
 	border: 1px solid #f0f;
-	display: block;
+	/* display: block; */
 	margin: 0;
 }
