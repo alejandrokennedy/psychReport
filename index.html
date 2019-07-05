@@ -13,25 +13,38 @@
 
 <script>
 
-const margin = {top: 30, right: 30, bottom: 30, left: 30};
+const margin = {top: 10, right: 30, bottom: 30, left: 130},
+	width = 670 - margin.left - margin.right,
+	rowHeight = 40
+	
 
-const width = 670 - margin.left - margin.right,
-	height = 400 - margin.top - margin.bottom,
-	rowHeight = 80
+////////////////////////////////////
+// BEESWARM SETUP
+////////////////////////////////////
+
+const beeMargin = margin,
+	beeWidth = width,
+	beeRowHeight = rowHeight
+
+const beeSvg = d3.select('#svg-container').append('svg')
+	.attr('id', 'beeSvg')
+	.attr('width', beeWidth + beeMargin.left + beeMargin.right)
+
+const beeGContainer = beeSvg.append('g')
+	.attr('id', 'beeGContainer')
+	.attr('transform', `translate(${beeMargin.left}, ${beeMargin.top})`)
+
+const beeYScale = d3.scalePoint()
+
+
+////////////////////////////////////
+// DATA IMPORT
+////////////////////////////////////
 
 importData()
 async function importData() {
 	
 const data = await d3.csv("data/louis1.csv");
-
-// const colors = 
-
-const xScale = d3.scaleLinear()
-	.domain([0, 100])
-	.range([0, width])
-
-const yScale = d3.scalePoint()
-	// .range([height, 0])
 
 const isNumeric = n => !isNaN(Number(n)) && isFinite(n)
 const numericFields = [ "test_score", "scaled_score", "standard_score", "percentile_rank", "percentile_band_min", "percentile_band_max"]
@@ -55,54 +68,193 @@ data.forEach((test) => {
 
 })
 
+const xScale = d3.scaleLinear()
+	.domain([0, 100])
+	.range([0, width])
+
+const yScale = d3.scalePoint()
+
 const domainsArr = [...domainsSet]
+
+const colors = d3.scaleOrdinal()
+	.domain(domainsArr)
+	.range(d3.schemeDark2)
 
 const domainsNested = domainsArr.map(domain => {
 	obj = {}
 	obj[domain] = []
 	data.forEach(test => {
 		if (test.domains.includes(domain)) {
-			obj[domain].push(test)
+			testCopy = Object.assign({}, test)
+			obj[domain].push(testCopy)
 		}
-
 	})
-	return Object.values(obj)
+	Object.values(obj)[0].sort((a, b) => (a.percentile_rank < b.percentile_rank) ? 1 : -1)
+	return obj
 })
 
 domainsNested.forEach(domain => {
-	let testArr = domain[0].map(test => test.test)
-	domain[0].forEach(test => test.domainArr = testArr)
+	let testArr = Object.values(domain)[0].map(test => test.test)
+	Object.values(domain)[0].forEach(test => {
+		test.domainArr = testArr
+		test.svgDomain = Object.keys(domain)[0]
+	})
 })
 
+
+////////////////////////////////////
+// DODGE
+////////////////////////////////////
+
+const dodge = (data, radius) => {
+  const radius2 = radius ** 2;
+  const circles = data.map(d => ({x: xScale(d.percentile_rank), data: d})).sort((a, b) => a.x - b.x);
+  const epsilon = 1e-3;
+  let head = null, tail = null;
+
+  // Returns true if circle ⟨x,y⟩ intersects with any circle in the queue.
+  function intersects(x, y) {
+    let a = head;
+    while (a) {
+      if (radius2 - epsilon > (a.x - x) ** 2 + (a.y - y) ** 2) {
+        return true;
+      }
+      a = a.next;
+    }
+    return false;
+  }
+
+  // Place each circle sequentially.
+  for (const b of circles) {
+
+    // Remove circles from the queue that can’t intersect the new circle b.
+    while (head && head.x < b.x - radius2) head = head.next;
+
+    // Choose the minimum non-intersecting tangent.
+    if (intersects(b.x, b.y = 0)) {
+      let a = head;
+      b.y = Infinity;
+      do {
+        let y1 = a.y + Math.sqrt(radius2 - (a.x - b.x) ** 2);
+        let y2 = a.y - Math.sqrt(radius2 - (a.x - b.x) ** 2);
+        if (Math.abs(y1) < Math.abs(b.y) && !intersects(b.x, y1)) b.y = y1;
+        if (Math.abs(y2) < Math.abs(b.y) && !intersects(b.x, y2)) b.y = y2;
+        a = a.next;
+      } while (a);
+    }
+
+    // Add b to the queue.
+    b.next = null;
+    if (head === null) head = tail = b;
+    else tail = tail.next = b;
+  }
+
+  return circles;
+}
+
+////////////////////////////////////
+// BEESWARM CHART
+////////////////////////////////////
+
+const beeHeight = domainsNested.length * beeRowHeight
+
+beeSvg.attr('height', beeHeight + beeMargin.top + beeMargin.bottom)
+
+beeYScale
+	// why does this need to be reversed to appear correctly?
+	.domain(domainsArr.reverse())
+	.range([beeRowHeight * domainsArr.length, 0])
+	.padding(.5)
+
+const beeRadius = 5
+const beePadding = 1.5
+
+const beeXAxis = beeGContainer.append('g')
+	.attr('class', 'bee x axis')
+	.call(d3.axisBottom(xScale))
+	.attr('transform', `translate(0,${beeHeight + margin.top})`)
+
+const beeYAxis = beeGContainer.append('g')
+	.attr('class', 'bee y axis')
+	.call(d3.axisLeft(beeYScale))
+	.selectAll('.domain')
+		.attr('stroke', 'transparent')
+
+const swarmGs = beeGContainer.selectAll('.swarmGs')
+	.data(domainsNested)
+	.enter().append('g')
+		.attr('class', d => `${Object.keys(d)} swarmGs`)
+		.attr('transform', d => `translate(${0}, ${beeYScale(Object.keys(d))})`)
+
+const beeCircles = swarmGs.selectAll('circle')
+	.data(d => dodge(Object.values(d)[0], beeRadius * 2 + beePadding))
+	.enter().append('circle')
+	.attr('cx', d => d.x)
+	.attr('cy', d => d.y)
+	.attr('r', beeRadius)
+	.style('fill', d => colors(d.data.svgDomain))
+
+
+////////////////////////////////////
+// DOMAIN CHARTS
+////////////////////////////////////
+
 const svg = d3.select('#svg-container')
-	.selectAll('svg')
+	.selectAll('.svg')
 	.data(domainsNested)
   .enter().append('svg')
 	.attr('class', 'svg')
 	.attr('width', width + margin.left + margin.right)
-	// .attr('height', height + margin.top + margin.bottom)
-	.attr('height', d => {
-		// console.log(d[0][0])
-		console.log(d[0].length)
-		// console.log(rowHeight * d[0][0].domainArr.length + margin.top + margin.bottom)
-		return rowHeight * d[0].length + margin.top + margin.bottom
-	})
+	.attr('height', d => rowHeight * Object.values(d)[0].length + margin.top + margin.bottom)
 
 const gContainer = svg.append('g')
 	.attr('class', 'gContainer')
-	.attr('transform', `translate(${margin.left},${margin.top})`)
+	.attr('transform', d => {
+		return `translate(${margin.left},${margin.top})`
+	})
+
+const xAxis = gContainer.append('g')
+	.attr('class', 'x axis')
+	.call(d3.axisBottom(xScale))
+
+const yAxisGroup = gContainer.append('g')
+	.attr('class', 'y axis')
+	.each(function(d, i) {
+		const domainArr = Object.values(d)[0][0].domainArr
+		yScale.domain(domainArr)
+		yScale.range([rowHeight * domainArr.length, 0])
+		.padding(.5)
+
+		const yAxis = d3.axisLeft(yScale)
+
+		const axisElements = d3.select(this).call(yAxis)
+
+		axisElements
+			.selectAll('.domain')
+			.attr('stroke', 'transparent')
+
+		axisElements
+			.selectAll('line')
+			// .attr('stroke', 'red')
+	})
+
+xAxis.attr('transform', d => {
+	svgHeight = rowHeight * Object.values(d)[0].length + margin.top
+	return `translate(0,${svgHeight})`
+})
 
 const circles = gContainer.selectAll('circle')
-	.data(d => d[0])
+	.data(d => Object.values(d)[0])
   .enter().append('circle')
-	.attr('r', '20')
+	.attr('r', '10')
 	.attr('cx', d => xScale(d.percentile_rank))
 	.attr('cy', d => {
 		yScale.domain(d.domainArr)
-		yScale.range([rowHeight * d.domainArr.length, 0])
-		console.log(yScale.range())
+			.range([rowHeight * d.domainArr.length, 0])
+			.padding(.5)
 		return yScale(d.test)
 	})
+	.style('fill', d => colors(d.svgDomain))
 
 const label = circles.append('text')
 	.attr('text', d => d.test)
