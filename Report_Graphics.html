@@ -3,20 +3,69 @@
 
 <head>
 	<!-- <script src=https://cdnjs.cloudflare.com/ajax/libs/d3/5.5.0/d3.min.js></script> -->
-	<script src=d3v5_7.js></script>
-	<link rel="stylesheet" type="text/css" href="main.css"></head>
+	<script src=.report_graphics_system_files/d3v5_7.js></script>
+	<link rel="stylesheet" type="text/css" href=".report_graphics_system_files/main.css"></head>
 </head>
 
 <body>
 
-<div id="svg-container"></div>
+<div id="svg-container">
+	<div id="dropTextDiv">
+		<p>Drop .csv file on page</p>
+	</div>
+</div>
 
 <script>
 
 const margin = {top: 10, right: 30, bottom: 30, left: 130},
 	width = 670 - margin.left - margin.right,
 	rowHeight = 40
-	
+
+
+	////////////////// REMOVE PREVIOUS SVGs if new drag n drop!!!
+
+////////////////////////////////////
+// DRAG N DROP
+////////////////////////////////////
+
+const svgContainer = d3.select('#svg-container')
+
+const dropArea = svgContainer.node()
+
+eventArr = ['dragenter', 'dragover', 'dragleave', 'drop']
+
+function preventDefaults (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+
+eventArr.forEach(event => {
+	dropArea.addEventListener(event, preventDefaults, false)
+})
+
+dropArea.addEventListener('drop', ev => {
+	if (ev.dataTransfer) {
+		const f = ev.dataTransfer.files[0]
+		const reader = new FileReader()
+		reader.onload = (function(theFile) {
+			return function(e) {
+				p = d3.csvParse(e.target.result)
+				d3.select('#dropTextDiv').remove()
+				drawChart(p)
+			}
+		})(f)
+		reader.readAsText(f)
+	} else {
+		console.warn('not ev.dataTransfer')
+	}
+})
+
+////////////////////////////////////
+// DRAW CHART
+////////////////////////////////////
+
+function drawChart(data) {
+
 
 ////////////////////////////////////
 // BEESWARM SETUP
@@ -38,13 +87,8 @@ const beeYScale = d3.scalePoint()
 
 
 ////////////////////////////////////
-// DATA IMPORT
+// DOMAINS DATA + SCALES, ETC
 ////////////////////////////////////
-
-importData()
-async function importData() {
-	
-const data = await d3.csv("data/louis1.csv");
 
 const isNumeric = n => !isNaN(Number(n)) && isFinite(n)
 const numericFields = [ "test_score", "scaled_score", "standard_score", "percentile_rank", "percentile_band_min", "percentile_band_max"]
@@ -199,8 +243,7 @@ const beeCircles = swarmGs.selectAll('circle')
 // DOMAIN CHARTS
 ////////////////////////////////////
 
-const svg = d3.select('#svg-container')
-	.selectAll('.svg')
+const svg = svgContainer.selectAll('.svg')
 	.data(domainsNested)
   .enter().append('svg')
 	.attr('class', 'svg')
@@ -260,7 +303,7 @@ const label = circles.append('text')
 	.attr('text', d => d.test)
 	.attr('transform', `translate(20, 0)`)
 
-} // importData callback
+} // drawChart callback
 
 </script>
 

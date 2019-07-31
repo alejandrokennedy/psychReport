@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+cd Dropbox\ \(Meredith\)/otherProjects/psychReport/guts/
+
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome "http://localhost:8000/"
+
 echo "running python simple server..."
 python -m SimpleHTTPServer
 
